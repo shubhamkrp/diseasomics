@@ -22,7 +22,7 @@ for t in ontology2.terms():
   if t.obsolete: c2+=1
 
 print(c1)
-c2
+print(c2)
 
 !pip install wikipedia-api
 import wikipediaapi
@@ -73,6 +73,12 @@ print(disease_pgtitle['pagetitle'].isnull().sum())
 
 print(len(disease_pgtitle)-disease_pgtitle['superpagetitle'].isnull().sum())
 
+these_ids=[]
+for idx, row in disease_pgtitle.iterrows():
+  if not pd.isna(row['superpagetitle']):
+    these_ids.append(row['id'])
+
+
 #25 minute runtime
 #GETTING IF SIGNS OR SYMPTOMS ARE PRESENT IN DOID PAGETITLES (NOT SUPER PAGETITLES)
 no_section_ids=[] #no signs and symptoms section in the wiki page (PAGETITLE)
@@ -106,8 +112,9 @@ for idx, row in disease_pgtitle.iterrows():
                 dis_symp[row['id']].append(term.id)
             else:
                 for synonym in term.synonyms:
-                    if str(synonym) in signs_and_symptoms_text:
-                        dis_symp[row['id']].append(term.id)
+                  synonym=synonym.description
+                  if str(synonym) in signs_and_symptoms_text:
+                    dis_symp[row['id']].append(term.id)
 
 # Display the results
 print("IDs with no signs and symptoms section:", len(no_section_ids))
@@ -118,6 +125,7 @@ for doid,values in dis_symp.items():
 print(count)
 # is the number of diseases which got symptoms
 
+
 count=0
 for doid,values in dis_symp.items():
   if values==[]:
@@ -127,6 +135,7 @@ for doid,values in dis_symp.items():
 
 print(count)
 # is the number of diseases which had pagetitle but have not got symptoms
+
 
 print(len(no_section_ids))
 
@@ -152,7 +161,7 @@ print(f"CSV file saved as {file_path}")
 
 #FROM HERE
 
-#for no_section_ids, i'm using full text since almost all text is small. (otherwise, should use text summary or UMLS metamap)
+#for no_section_ids, using full text since almost all text is small. (otherwise, should use text summary or UMLS metamap)
 
 still_nomatch_ids=[] #no signs and symptoms section in the wiki page (PAGETITLE)
 i=0
@@ -168,6 +177,7 @@ for id_ in sympless_withpage_ids:
       if term.name in page.text and not term.obsolete: dis_symp[id_].append(term.id)   # change this to [0:1000]
       else:
         for synonym in term.synonyms:
+          synonym=synonym.description
           if str(synonym) in page.text and not term.obsolete: dis_symp[id_].append(term.id) # change this to [0:1000]
     if dis_symp[id_]==[]: still_nomatch_ids.append(id_)
 
@@ -191,7 +201,7 @@ print(count)
 
 print(len(dis_symp))
 
-still_nomatch_ids
+print(still_nomatch_ids)
 
 import csv
 file_path = 'still_nomatch_ids.csv'
@@ -202,3 +212,62 @@ with open(file_path, 'w', newline='') as file:
     writer.writerows([[id_] for id_ in still_nomatch_ids])  # Convert list to 2D list for CSV
 
 print(f"CSV file saved as {file_path}")
+
+# Write dictionary to CSV
+with open('dis_symp_relations.csv', mode='w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Disease', 'Symptom'])  # Header row
+
+    # Write each disease and its symptoms
+    for disease, symptoms in dis_symp.items():
+        for symptom in symptoms:
+          #symptoms_str = ', '.join(symptoms)  # Join symptoms with a comma
+          writer.writerow([disease, symptom])
+
+print("CSV file 'dis_symp_relations.csv' created with disease-symptom relationships.")
+
+count=0
+for id_,symps in dis_symp.items():
+  if dis_symp[id_]!=[]:
+    count+=1
+count
+
+dis_symp_final={}
+for id_,symps in dis_symp.items():
+  if dis_symp[id_]!=[]:
+    count+=1
+    dis_symp_final[id_]=dis_symp[id_]
+print(len(dis_symp_final))
+
+i=0
+for x in dis_symp_final:
+  i+=1
+  if i<10: print(x)
+
+print(len(these_ids))
+
+print(these_ids[0:7])
+
+count=0
+matched_terms = []
+for term in ontology2.terms():
+    if term.id in these_ids:
+        for kind in term.superclasses(distance=1):
+          jjj=kind.id
+          if jjj in dis_symp_final:
+            count+=1
+            break
+count
+
+# Write dictionary to CSV
+with open('final_dis_symp_relations.csv', mode='w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Disease_id', 'Symptom_id'])  # Header row
+
+    # Write each disease and its symptoms
+    for disease, symptoms in dis_symp_final.items():
+        for symptom in symptoms:
+          #symptoms_str = ', '.join(symptoms)  # Join symptoms with a comma
+          writer.writerow([disease, symptom])
+
+print("CSV file 'final_dis_symp_relations.csv' created with disease-symptom relationships.")
